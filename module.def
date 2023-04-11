@@ -1,0 +1,6 @@
+[Module]
+Name=SideChick
+Dependencies=minionlib
+Version=1
+Files=sidechick.lua
+enabled=1
