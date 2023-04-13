@@ -2,8 +2,29 @@
 SideChick
 Version: 0.0.1
 This is a interoperability addon. See Acen#3040 on Discord for more information.]]
+---@class Debug
+---@field state boolean
+---@field startTimer string
+---@field endTimer string
+---@field runCount number
+---@field maxRunCount number
+
+---@class Interface
+---@field font_data_cache table
+---@field Font_Data table
+---@field options table
+
 
 ---@class SideChick
+---@field debug Debug
+---@field AcceptedMessageTypes table
+---@field ProcessedMessages table
+---@field Directories table
+---@field state string
+---@field lastParsedMessage table
+---@field lastProcessedMessage table
+---@field messageIndex number
+---@field interface Interface
 SideChick = {
     state = "booting",
     lastParsedMessage = {},
@@ -23,13 +44,13 @@ SideChick.AcceptedMessageTypes = {
 }
 SideChick.ProcessedMessages = {}
 
--- Path settings
----@type string
-local LuaPath = GetLuaModsPath()
----@type string
-local AddonPath = LuaPath .. "/SideChick"
----@type string
-local InterfaceSettings = ModulePath .. "interface.lua"
+SideChick.Directories = {
+    luaPath = GetLuaModsPath(),
+    addonPath = GetLuaModsPath() .. "/SideChick",
+    interfaceSettings = GetLuaModsPath() .. "/SideChick/interface.lua",
+    font = GetLuaModsPath() .. "/SideChick/font.png",
+    fontData = GetLuaModsPath() .. "/SideChick/font_data.lua",
+}
 
 ---@type fun(clean: boolean): string
 function SideChick.time(clean)
@@ -54,6 +75,9 @@ end
 ---@type fun(message: string): void
 local function log(message)
     if (SideChick.debug.state) then
+        if(SideChick.interface ~= nil) then
+            SideChick.interface.Console.log("   [" .. SideChick.time() .. "] " ..message)
+        end
         d("[SideChick:".. SideChick.time() .. "] " .. message)
     else
         d("[SideChick] " .. message)
@@ -63,6 +87,9 @@ end
 ---@type fun(message: string): void
 local function info(message)
     if(SideChick.debug.state) then
+        if(SideChick.interface ~= nil) then
+            SideChick.interface.Console.info("*** [" .. SideChick.time() .. "] " ..message)
+        end
         d("[* SideChick:".. SideChick.time() .. "] " .. message)
     else
         d("[* SideChick] " .. message)
@@ -72,6 +99,9 @@ end
 ---@type fun(message: string): void
 local function error(message)
     if(SideChick.debug.state) then
+        if(SideChick.interface ~= nil) then
+            SideChick.interface.Console.error("!!! [" .. SideChick.time() .. "] " ..message)
+        end
         d("[!!! SideChick:".. SideChick.time() .. "] " .. message)
     else
         d("[!!! SideChick] " .. message)
@@ -183,17 +213,30 @@ function SideChick.parseChatMessage(message)
 end
 
 function SideChick.LoadInterface()
-    local tbl = FileLoad(InterfaceSettings)
+    SideChick.state = "loading interface"
+    local interface = FileLoad(SideChick.Directories.interfaceSettings)
+    SideChick.interface = interface
+
+    SideChick.interface.initialize()
 end
 
---type fun(): void
+---@type fun(): void
 function SideChick.startTheParty()
     log("Status: [" .. SideChick.state .. "]")
+    -- Load Interface
+    SideChick.LoadInterface()
+    --log("Status: [" .. SideChick.state .. "]")
     --log("I'm going to run a loop that will get the last message in chat every [Gameloop.Update]. Hold onto your butt.")
     SideChick.state = "running"
 end
 
---type fun(): void
+function SideChick.onDraw()
+    if(SideChick.interface ~= nil) then
+        SideChick.interface.onDraw()
+    end
+end
+
+---@type fun(): void
 function SideChick.onUpdate()
     if (SideChick.state == "running") then
         if (SideChick.debug.runCount >= SideChick.debug.maxRunCount) then
@@ -220,5 +263,9 @@ function SideChick.onUpdate()
     end
 end
 
+SideChick.log = log
+
 RegisterEventHandler("Module.Initalize", SideChick.startTheParty, "SideChick.startTheParty")
 RegisterEventHandler("Gameloop.Update", SideChick.onUpdate, "SideChick.onUpdate")
+RegisterEventHandler("Gameloop.Draw", SideChick.onDraw, "SideChick.onDraw")
+

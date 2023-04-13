@@ -1,47 +1,91 @@
 local interface = {}
 
-interface.font_data_cache = {}
+interface.options = {
+    open = false,
+    visible = true,
+}
 
-function interface.print_characters(str, font_size)
-    self.Font_Data.positioning.x_offset = 0
-    self.Font_Data.positioning.max_origin_y = 0
-
-    local rects = {}
-    if not (type(font_size) == "number") then
-        font_size = 1
-    end
-
-    for i = 1, #str do
-        local character = string.sub(str, i, i)
-        local char_data = interface.font_data_cache[character]
-        if not char_data then
-            char_data = self.Font_Data.characters[character]
-            interface.font_data_cache[character] = char_data
-        end
-        if char_data then
-            if char_data.originY > self.Font_Data.positioning.max_origin_y then
-                self.Font_Data.positioning.max_origin_y = char_data.originY
-            end
-            local x = self.Font_Data.positioning.x_offset - char_data.originX * font_size
-            local y = self.Font_Data.positioning.max_origin_y - char_data.originY * font_size
-            local width = char_data.width * font_size
-            local height = char_data.height * font_size
-            local u1 = char_data.x / 765
-            local v1 = char_data.y / 257
-            local u2 = (char_data.x + char_data.width) / 765
-            local v2 = (char_data.y + char_data.height) / 257
-            table.insert(rects, {x, y, width, height, u1, v1, u2, v2})
-            self.Font_Data.positioning.x_offset = self.Font_Data.positioning.x_offset + char_data.advance * font_size
-        end
-    end
-
-    GUI:BeginGroup()
-    local cursor_x, cursor_y = GUI:GetCursorPos()
-    for _, rect in ipairs(rects) do
-        GUI:SetCursorPos(cursor_x + rect[1], cursor_y + rect[2])
-        GUI:Image(self.Directories.Icons_Path .. "\\output.png", rect[3], rect[4], rect[5], rect[6], rect[7], rect[8])
-    end
-    GUI:EndGroup()
+local Console = {
+    history = {
+        {message = "Log -- 0", type = 0},
+        {message = "Notice -- 1", type = 1},
+        {message = "Error -- 2", type = 2},
+        {message = "Info -- 3", type = 3},
+    },
+}
+function Console.clear()
+    Console.history = {}
 end
+
+function Console.Elements()
+    GUI:BeginChild("##SideChick_Console", 0, 0, true)
+        if(GUI:SmallButton("Clear")) then
+            Console.clear()
+        end
+        GUI:BeginChild("##SideChick_Console_History", 0, 0, true)
+        for _, v in pairs(Console.history) do
+            if(v.type == 0) then
+                -- Log
+                -- White
+                GUI:TextColored(1,1,1,1,v.message)
+            elseif(v.type == 1) then
+                -- Notice
+                -- Yellow
+                GUI:TextColored(1,1,0,1,v.message)
+            elseif(v.type == 2) then
+                -- Error
+                -- Red
+                GUI:TextColored(1,0,0,1,v.message)
+            elseif(v.type == 3) then
+                -- Info
+                -- Blue
+                GUI:TextColored(0,0,1,1,v.message)
+            end
+        end
+        GUI:EndChild()
+    GUI:EndChild()
+end
+
+function Console.log(message)
+    table.insert(Console.history, {message = message, type = 0})
+end
+
+function Console.notice(message)
+    table.insert(Console.history,{mesage = message, type = 1})
+end
+
+function Console.error(message)
+    table.insert(Console.history,{mesage = message, type = 2})
+end
+
+function Console.info(message)
+    table.insert(Console.history,{mesage = message, type = 3})
+end
+
+local function initialize()
+    ml_gui.ui_mgr:AddMember({ id = "FFXIVMINION##MENU_SideChick", name = "SideChick", onClick = function() interface.options.open = not interface.options.open end, tooltip = "Talk to your SideChick"},"FFXIVMINION##MENU_HEADER")
+
+    Console.log("Log Test.")
+end
+
+local function onDraw()
+    local gamestate = GetGameState()
+    if ( gamestate == FFXIV.GAMESTATE.INGAME ) then
+        if ( interface.options.open ) then
+            GUI:SetNextWindowSize(580,300,GUI.SetCond_FirstUseEver)
+            interface.options.visible, interface.options.open = GUI:Begin("SideChick", interface.options.open, GUI.WindowFlags_NoCollapse)
+            GUI:BeginChild("##SideChick", 0, 0, true)
+                GUI:Text("Status - " .. SideChick.state)
+                Console.Elements()
+            GUI:EndChild()
+            GUI:End()
+        end
+    end
+end
+
+interface.onDraw = onDraw
+interface.initialize = initialize
+
+interface.Console = Console
 
 return interface
