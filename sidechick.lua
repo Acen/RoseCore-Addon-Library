@@ -1,4 +1,9 @@
+--[[
+SideChick
+Version: 0.0.1
+This is a interoperability addon. See Acen#3040 on Discord for more information.]]
 
+---@class SideChick
 SideChick = {
     state = "booting",
     lastParsedMessage = {},
@@ -18,7 +23,16 @@ SideChick.AcceptedMessageTypes = {
 }
 SideChick.ProcessedMessages = {}
 
-function SideChick.Time(clean)
+-- Path settings
+---@type string
+local LuaPath = GetLuaModsPath()
+---@type string
+local AddonPath = LuaPath .. "/SideChick"
+---@type string
+local InterfaceSettings = ModulePath .. "interface.lua"
+
+---@type fun(clean: boolean): string
+function SideChick.time(clean)
     if not (type(clean) == "boolean") then
         clean = true
     end
@@ -37,26 +51,40 @@ function SideChick.Time(clean)
     return time
 end
 
+---@type fun(message: string): void
 local function log(message)
     if (SideChick.debug.state) then
-        d("[SideChick:".. SideChick.Time() .. "] " .. message)
+        d("[SideChick:".. SideChick.time() .. "] " .. message)
     else
         d("[SideChick] " .. message)
     end
 end
 
+---@type fun(message: string): void
+local function info(message)
+    if(SideChick.debug.state) then
+        d("[* SideChick:".. SideChick.time() .. "] " .. message)
+    else
+        d("[* SideChick] " .. message)
+    end
+end
+
+---@type fun(message: string): void
 local function error(message)
     if(SideChick.debug.state) then
-        d("[!!! SideChick:".. SideChick.Time() .. "] " .. message)
+        d("[!!! SideChick:".. SideChick.time() .. "] " .. message)
     else
         d("[!!! SideChick] " .. message)
     end
 end
 
-function SideChick.Has(table, key)
+---@type fun(table: table, key: string): boolean
+function SideChick.has(table, key)
     return table[key] ~= nil
 end
 
+
+---@type fun(table: table, value: any): boolean
 function SideChick.includes(table, value)
     for _,v in pairs(table) do
         if (v == value) then
@@ -66,7 +94,9 @@ function SideChick.includes(table, value)
     return false
 end
 
-function SideChick.GetLastMessageKey(index, fresh)
+
+---@type fun(index: number, fresh: boolean): number
+function SideChick.getLastMessageKey(index, fresh)
     if not (type(index) == "number") then
         index = 0
     end
@@ -84,7 +114,8 @@ function SideChick.GetLastMessageKey(index, fresh)
     return mostRecentMessageKey + index
 end
 
-function SideChick.GetLastMessages(count)
+---@type fun(count: number): void
+function SideChick.getLastMessages(count)
     if(not (type(count) == "number")) then
         count = 1
     end
@@ -98,7 +129,7 @@ function SideChick.GetLastMessages(count)
         if(i == 0) then
             fresh = true
         end
-        local messageKey = SideChick.GetLastMessageKey(i, fresh)
+        local messageKey = SideChick.getLastMessageKey(i, fresh)
         local message = GetChatLines()[messageKey]
         if not (type(message) == "table") then
             error("message is not a table")
@@ -112,21 +143,25 @@ function SideChick.GetLastMessages(count)
             table.print(message)
         end
 
-        if not (SideChick.Has(SideChick.AcceptedMessageTypes, typeIdentifier)) then
-            log("Message type not accepted - " .. typeIdentifier)
+        if not (SideChick.has(SideChick.AcceptedMessageTypes, typeIdentifier)) then
+            info("Message type not accepted - " .. typeIdentifier)
             break
         end
 
         local type = SideChick.AcceptedMessageTypes[typeIdentifier]
         if (type == "say") then
-            messageName, messageText = SideChick.ParseChatMessage(message)
+            messageName, messageText = SideChick.parseChatMessage(message)
+        end
+        if(type == "echo") then
+            messageName = "System"
+            messageText = message.line
         end
 
         table.insert(messages, {
             ["name"] = messageName,
             ["text"] = messageText,
             ["key"] = messageKey,
-            ["type"] = typeIdentifier,
+            ["type"] = type,
         })
     end
 
@@ -134,7 +169,8 @@ function SideChick.GetLastMessages(count)
 
 end
 
-function SideChick.ParseChatMessage(message)
+---@type fun(message: table): string, string
+function SideChick.parseChatMessage(message)
     if not (type(message) == "table") then
         error("Invalid message - not a table")
         return
@@ -146,14 +182,19 @@ function SideChick.ParseChatMessage(message)
     return messageName, messageText
 end
 
+function SideChick.LoadInterface()
+    local tbl = FileLoad(InterfaceSettings)
+end
 
-function SideChick.StartTheParty()
+--type fun(): void
+function SideChick.startTheParty()
     log("Status: [" .. SideChick.state .. "]")
     --log("I'm going to run a loop that will get the last message in chat every [Gameloop.Update]. Hold onto your butt.")
     SideChick.state = "running"
 end
 
-function SideChick.OnUpdate()
+--type fun(): void
+function SideChick.onUpdate()
     if (SideChick.state == "running") then
         if (SideChick.debug.runCount >= SideChick.debug.maxRunCount) then
             log("exit loop")
@@ -162,11 +203,11 @@ function SideChick.OnUpdate()
         end
 
         if (SideChick.debug.state) then
-            SideChick.debug.startTimer = SideChick.Time()
+            SideChick.debug.startTimer = SideChick.time()
         end
-        SideChick.GetLastMessages(5)
+        SideChick.getLastMessages(5)
         if (SideChick.debug.state) then
-            SideChick.debug.endTimer = SideChick.Time()
+            SideChick.debug.endTimer = SideChick.time()
         end
 
         SideChick.debug.runCount = SideChick.debug.runCount + 1
@@ -179,5 +220,5 @@ function SideChick.OnUpdate()
     end
 end
 
-RegisterEventHandler("Module.Initalize", SideChick.StartTheParty, "SideChick.StartTheParty")
-RegisterEventHandler("Gameloop.Update", SideChick.OnUpdate, "SideChick.OnUpdate")
+RegisterEventHandler("Module.Initalize", SideChick.startTheParty, "SideChick.startTheParty")
+RegisterEventHandler("Gameloop.Update", SideChick.onUpdate, "SideChick.onUpdate")
